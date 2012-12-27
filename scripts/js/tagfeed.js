@@ -1,36 +1,30 @@
 	/**
-	 * @name hnTags
-	 * Generates feed from HN based on tags defined by the user. jQuery + UI Required.
+	 * @name tagFeed
+	 * Gets feed from its modules based on tags defined by the user. jQuery + UI Required.
 	 *
 	 * @author Ryoku Weil (w45p) | http://www.ryoku-weil.biz
-	 * @version 26-12-2012
+	 * @version 27-12-2012
 	 * 
 	 * @param debug Bool Show debugging output on console. Defaults to False
 	 * @param verbose Bool Show detailed step information on console. Defaults to False
 	 *
-	 * Methods: create, showMe, hideMe, setContent, destroy, toggle
 	 */
-	function hnTags(params,debug,verbose) 
+	function tagFeed(params,debug,verbose) 
 	{ 
 		/*
 		* Default params:
 		*/
 		this.defaultParams= {
 				  container  : $('body')  	 // Where to render. Element pointer or jQuery Object.
-				, style      : 'hntags'      // CSS Class Name Prefix. String.
+				, style      : 'tagFeed'      // CSS Class Name Prefix. String.
 				, autoLoad   : false   		 // Attempt to load cookie tags automatically? Boolean.
-				, id    	 : 'autoHnTags'	 // Custom ID for the frame element. String.
+				, id    	 : 'autoTagFeed'	 // Custom ID for the frame element. String.
 		};
-		
 		/*
-		 *	HN API - CONFIGURATION.
-		 */
-		this.url="http://api.thriftdb.com/api.hnsearch.com/items/";
-		this.searchStr="_search";
-		this.urlParams={
-			 'filter[fields][type]':'submission'
-			,'pretty_print':'false'
-			,'highlight[markup_items]':'true'
+		* Feed Library  -> Name of classes.
+		*/
+		this.feedLib= {
+				  HackerNews  : hnFeed
 		};
 		
 		/*
@@ -41,9 +35,9 @@
 		this.q='';
 		this.news=null;
 		this.oops=null;
+		this.sorted=new Object();
 		this.qArr=new Array();
-		this.lastSearch=null;
-
+		this.shell=new Object();
 		
 		/*
 		 * ----> Debugging Functions START<----
@@ -60,7 +54,7 @@
 		 */
 		var error = function(message){
 			if(debug)
-				console.log("-- hnTags Class -FATAL ERROR- :: " + message);
+				console.log("-- tagFeed Class -FATAL ERROR- :: " + message);
 			return;
 		};
 		/**
@@ -70,7 +64,7 @@
 		 */
 		var warning = function(message){
 			if(debug)
-				console.log("-- hnTags Class -WARNING- :: " + message);
+				console.log("-- tagFeed Class -WARNING- :: " + message);
 			return;
 		};
 		/**
@@ -80,16 +74,12 @@
 		 */
 		var notice = function(message){
 			if(verbose)
-				console.log("-- hnTags Class -NOTICE- :: " + message);
+				console.log("-- tagFeed Class -NOTICE- :: " + message);
 			return;
 		};
 		/*	----> Debugging Functions  END <----	*/
 		 
-		 
-		
-		
-		
-		
+
 		/**
 		 * Public Method setPNode()
 		 * Renders and sets parent node (PNode),
@@ -109,70 +99,106 @@
 		
 		/**
 		 * Public Method fetchNews()
-		 * Merges user options with default parameters.
-		 * Calls create().
+		 * Instanciates each module and fetches all news.
+		 * Calls renderNews();
 		 */
 		this.fetchNews = function() {
-			var _self=this, endUrl='', preUrl='';
-			notice("Fetching HN news...");
-			for (var i in _self.urlParams)
-				preUrl+="&" + i + "=" + _self.urlParams[i];
-			endUrl=_self.url + _self.searchStr + "?q=" + _self.q + preUrl;
+			this.shell=new Object();
+			this.news=new Object();
+			var _self=this;
+			//This watcher element will force syncronous behaviour.
+					var watcher = jQuery('<div/>',{
+						 id: "watcher",
+						 style: "display:none"
+					}).appendTo(this.PNode);
+							
+					watcher.change(function() {
+						_self.renderNews();
+					});			
 			
-			$.ajax({	
-				url: endUrl,
-				dataType: "jsonp",
-				success: function(data,textStatus,jqXHR){	
-					_self.news=data;
-					_self.renderNews();
-				},
-				error: function(jqXHR,textStatus,errorThrown){
-					_self.oops={jqXHR:jqXHR,textStatus:textStatus,errorThrown:errorThrown};
-					_self.renderError();
-				},
-				statusCode: {
-					404: function() {
-						_self.oops={jqXHR:'',textStatus:"Woopsies! That thing you're looking for must have been eaten by monkeys.",errorThrown:404};
-						_self.renderError();
-					},
-					500: function() {
-						_self.oops={jqXHR:'',textStatus:"Oops! There was a problem with the server. Are you doing weird things with your query tags?",errorThrown:500};
-						_self.renderError();
-					},
-					503: function() {
-						_self.oops={jqXHR:'',textStatus:"I'm sorry, the service seems to be down. Please try again later.",errorThrown:503};
-						_self.renderError();
-					}
-				},
-			});	
-		};
-		
-		
-		/**
-		 * Public Method fetchNews()
-		 * Merges user options with default parameters.
-		 * Calls create().
-		 */
-		this.renderNews = function() {
-			this.lastSearch=this.news;
-			console.debug(this.news);
-			for (var i in this.news.results){
-				jQuery('<div>' + this.news.results[i].item.title + '</div>', {
-					id: this.news.results[i].item.id,
-				}).appendTo(this.PNode);
+			/* If Exists Load HN Feed Module */
+			for(var i in this.feedLib){
+				this.news[i]=new Array();
+				if (typeof this.feedLib[i] === 'function'){
+					notice("Fetching " + i + "...");
+					this.shell[i]= new this.feedLib[i](this.qArr,true,true);
+				}
 			}
 		};
 		
 		
 		/**
-		 * Public Method fetchNews()
-		 * Merges user options with default parameters.
-		 * Calls create().
+		 * Public Method renderNews()
+		 * Renders news or Error resulting from not finding data.
+		 * Calls sortNews();
 		 */
-		this.renderError = function() {
-			this.options.container.html("Error: " + this.oops.errorThrown + " - " + this.oops.textStatus );
+		this.renderNews = function() {
+			this.news=new Object();
+			for(var i in this.feedLib){
+				this.news[i]=new Array();
+				if (typeof this.feedLib[i] === 'function'){
+					this.news[i].results=this.shell[i].results;
+					this.news[i].hits=this.shell[i].hits;
+				}
+			}
+		
+			if(this.news==null){
+				jQuery('<div class="' + this.options.stlye + ' error">Oops! We didn\'t find any results with your tags.</div>',{
+				 id: "NOT"
+				}).appendTo(this.PNode);
+				notice("Feed is empty.");
+				return
+			}
+			this.sortNews();
+			for (var i in this.sorted){
+				if(this.sorted[i].error==1){
+					notice("No feeds were found at: " + this.sorted[i].source);
+					jQuery('<div class="' + this.options.stlye + ' ' + this.sorted[i].source + ' empty">Sorry, no matching feeds were found at ' + this.sorted[i].source + '.<br> Try changing your tags.</div>', {
+						id: this.sorted[i].source,
+					}).appendTo(this.PNode);
+				} else if(this.sorted[i].error==2){
+					warning("An error was encountered at feed : " + this.sorted[i].source);
+					jQuery('<div class="' + this.options.stlye + ' ' + this.sorted[i].source + ' error">Oops! ' + this.sorted[i].results + '.</div>', {
+						id: this.sorted[i].source,
+					}).appendTo(this.PNode);
+				} else {
+					jQuery('<div class="' + this.options.stlye + ' ' + this.sorted[i].source + '"><a href="' + this.sorted[i].url + '">' + this.sorted[i].title + '</a></div>', {
+						id: this.sorted[i].source + '-' + this.sorted[i].id,
+					}).appendTo(this.PNode);
+				}
+			}
 		};
 		
+		
+		/**
+		 * Public Method sortNews()
+		 * Sorts All news in a simple object for printing.
+		 * This WILL be in charge of prioritizing entries from different feeds.
+		 */
+		this.sortNews = function(){
+			this.sorted=new Object();
+			for (var i in this.news){
+				if(this.news[i].hits==0){
+					this.sorted[i]=new Object()
+					this.sorted[i].error=1;
+					this.sorted[i].source=i;
+				} else if(this.news[i].hits==-1){
+					this.sorted[i]=new Object()
+					this.sorted[i].error=2;
+					this.sorted[i].source=i;
+					this.message=this.news[i].results;
+				} else {
+					for (var j in this.news[i].results){
+					this.sorted[i + "-" + j]=new Object();
+						this.sorted[i + "-" + j]=this.news[i].results[j];
+						this.sorted[i + "-" + j].error=0; 
+						this.sorted[i + "-" + j].source=i;
+					}
+				}
+			}
+				//this.options.container.html("Error: " + this.oops.errorThrown + " - " + this.oops.textStatus );
+		}
+				
 		 
 		/**
 		 * Public Method checkParams()
@@ -202,8 +228,8 @@
 				warning("style must be a string. Resetting to default.");
 				this.options.style=this.defaultParams.style;
 				if(typeof this.options.style != 'string'){
-					this.options.style='autoHNclass';
-					warning("default style must be a string. Setting to 'autoHNclass'.");
+					this.options.style='autoTagFeedclass';
+					warning("default style must be a string. Setting to 'autoTagFeedclass'.");
 				}
 			}
 				this.options.style = this.options.style.replace('.', '');
@@ -213,8 +239,8 @@
 				warning("id must be a string. Resetting to default.");
 				this.options.id=this.defaultParams.id;
 				if(typeof this.options.id != 'string'){
-					this.options.id='autoHNid';
-					warning("default id must be a string. Setting to 'autoHNid'.");
+					this.options.id='autoTagFeedid';
+					warning("default id must be a string. Setting to 'autoTagFeedid'.");
 				}
 			}
 				this.options.id = this.options.id.replace('.', '');
@@ -234,6 +260,7 @@
 		 */
 		this.init = function() {
 			notice("Initializing...");
+			this.checkParams();
 			if(this.options.autoLoad){
 				this.fetchTags();
 				this.setTags();
@@ -254,11 +281,6 @@
 		}
 		this.options = $.extend( {}, this.defaultParams, params);
 		notice("User Params + Default Params merged.");
-		
-		if(!this.checkParams){
-			warning("HERE");
-			return false;
-		}
 		
 		// Initialize.
 		this.init();	
