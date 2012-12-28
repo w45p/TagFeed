@@ -107,7 +107,6 @@
 		 
 		 /**
 		 * Public Method setTags()
-		 * Sets the query array.
 		 * Sets tags in cookies.
 		 */
 		this.setTags = function(){
@@ -194,7 +193,6 @@
 				if (typeof this.feedLib[i] === 'function'){
 					notice("Fetching " + i + "...");
 					this.shell[i]= new this.feedLib[i](this.qArr,true,true);
-					console.debug(this.qArr);
 				}
 			}
 		};
@@ -207,6 +205,7 @@
 		 */
 		this.renderNews = function() {
 			this.news=new Object();
+			
 			for(var i in this.feedLib){
 				this.news[i]=new Array();
 				if (typeof this.feedLib[i] === 'function'){
@@ -235,7 +234,7 @@
 						id: this.sorted[i].source,
 					}).appendTo(this.PNode);
 				} else {
-					jQuery('<div class="' + this.options.stlye + ' ' + this.sorted[i].source + '"><a href="' + this.sorted[i].url + '">' + this.sorted[i].title + '</a></div>', {
+					jQuery('<div class="' + this.options.stlye + ' ' + this.sorted[i].source + '"><a target="_blank" href="' + this.sorted[i].url + '">' + this.sorted[i].title + '</a></div>', {
 						id: this.sorted[i].source + '-' + this.sorted[i].id,
 					}).appendTo(this.PNode);
 				}
@@ -269,7 +268,6 @@
 					}
 				}
 			}
-				//this.options.container.html("Error: " + this.oops.errorThrown + " - " + this.oops.textStatus );
 		}
 				
 		 
