@@ -15,10 +15,12 @@
 		* Default params:
 		*/
 		this.defaultParams= {
-				  container  : $('body')  	 // Where to render. Element pointer or jQuery Object.
-				, style      : 'tagFeed'      // CSS Class Name Prefix. String.
-				, autoLoad   : false   		 // Attempt to load cookie tags automatically? Boolean.
+				  container  : $('body')  		 // Where to render. Element pointer or jQuery Object.
+				, style      : 'tagFeed'    	 // CSS Class Name Prefix. String.
+				, autoLoad   : true   			 // Attempt to load cookie tags automatically? Boolean.
 				, id    	 : 'autoTagFeed'	 // Custom ID for the frame element. String.
+				, cookieName : 'tagFeedCookie'	 // Name for the cookie. String.
+				, autoTag 	 : []				 // Default Tag values. Array.
 		};
 		/*
 		* Feed Library  -> Name of classes.
@@ -26,18 +28,23 @@
 		this.feedLib= {
 				  HackerNews  : hnFeed
 		};
-		
+		/*
+		* Password for cookie encrypt/decrypt.  Not really important, used to avoid security issues with cookies.
+		*/
+		this.password = 'B4z1ng4!';
+					
+
 		/*
 		 *	Initialize all vars.
 		 */
 		this.options=null;
 		this.PNode=null;
-		this.q='';
 		this.news=null;
 		this.oops=null;
 		this.sorted=new Object();
 		this.qArr=new Array();
 		this.shell=new Object();
+		this.cookieVal='';
 		
 		/*
 		 * ----> Debugging Functions START<----
@@ -80,6 +87,71 @@
 		/*	----> Debugging Functions  END <----	*/
 		 
 
+		 /**
+		 * Public Method fetchTags()
+		 * Looks up tags in cookies.
+		 * Looks up tags in body.
+		 */
+		this.fetchTags = function(){
+			this.cookieVal= this.getCookie();
+			if (this.cookieVal == null) {
+				this.qArr=this.options.autoTag;
+			} else {
+				// do cookie exists stuff
+				var temp="";
+				temp = Aes.Ctr.decrypt(this.cookieVal, this.password, 256);
+				this.qArr = temp.split(',');
+			}
+		};
+		 
+		 
+		 /**
+		 * Public Method setTags()
+		 * Sets the query array.
+		 * Sets tags in cookies.
+		 */
+		this.setTags = function(){
+			this.cookieVal = Aes.Ctr.encrypt(this.qArr.toString(), this.password, 256);
+			this.setCookie();
+		};
+		 
+		 
+		 /**
+		 * Public Method getCookie()
+		 */
+		this.getCookie = function() {
+			var name= this.options.cookieName;
+			var dc = document.cookie;
+			var prefix = name + "=";
+			var begin = dc.indexOf("; " + prefix);
+			if (begin == -1) {
+				begin = dc.indexOf(prefix);
+				if (begin != 0) return null;
+			}
+			else
+			{
+				begin += 2;
+				var end = document.cookie.indexOf(";", begin);
+				if (end == -1) {
+				end = dc.length;
+				}
+			}
+			return unescape(dc.substring(begin + prefix.length, end));
+		} 
+		
+		
+		/**
+		 * Public Method setCookie()
+		 */
+		this.setCookie = function()
+		{
+			var exdate=new Date(), exdays=null;
+			exdate.setDate(exdate.getDate() + exdays);
+			var c_value=escape(this.cookieVal) + ((exdays==null) ? "" : "; expires="+exdate.toUTCString());
+			document.cookie=this.options.cookieName + "=" + c_value;
+		}
+		 
+		 
 		/**
 		 * Public Method setPNode()
 		 * Renders and sets parent node (PNode),
@@ -122,6 +194,7 @@
 				if (typeof this.feedLib[i] === 'function'){
 					notice("Fetching " + i + "...");
 					this.shell[i]= new this.feedLib[i](this.qArr,true,true);
+					console.debug(this.qArr);
 				}
 			}
 		};
@@ -207,7 +280,6 @@
 		 * @return true
 		 */
 		this.checkParams = function(){	
-
 			if(typeof this.options.container == 'string'){
 				this.options.container = $(this.options.container);
 			} else if((this.options.container instanceof jQuery)===false){
@@ -249,6 +321,24 @@
 			if ($('#' + this.options.id).length > 0)
 				warning("an element with the same id '" + this.options.id + "' already exists. Issues may arise.");
 			
+			if((this.options.autoTag instanceof Array)==false){
+				this.options.autoTag=this.defaultParams.autoTag;
+				warning("autoTag must be an array. Setting queries to Default.");
+				if((this.options.autoTag instanceof Array)==false){
+					warning("autoTag must be an array. Setting queries to empty.");
+					this.options.autoTag=[];
+				}
+			}
+			
+			if(typeof this.options.cookieName != 'string'){
+				warning("cookieName must be a string. Resetting to default.");
+				this.options.cookieName=this.defaultParams.cookieName;
+				if(typeof this.options.cookieName != 'string'){
+					this.options.cookieName='autoTagFeedCookie';
+					warning("default cookieName must be a string. Setting to 'autoTagFeedCookie'.");
+				}
+			}
+
 			return true;
 		};
 		

@@ -162,9 +162,9 @@
 		 */
 		this.checkQ = function(){	
 			notice("Checking query tags...");
-			if(this.q.length === 0){
+			if((this.q.length instanceof Array)==false){
 				warning("If a query is sent, it must be an Array. Resetting to default");
-				if(this.defaultQ.length instanceof Array){
+				if((this.defaultQ instanceof Array)==false){
 					warning("defaultQ must be an array. Setting queries to empty.");
 					this.q=[];
 					return
