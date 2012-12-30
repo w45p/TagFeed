@@ -39,6 +39,11 @@
 		 */
 		this.options=null;
 		this.PNode=null;
+		this.FNode=null;
+		this.TNode=null;
+		this.tagTxt=null;
+		this.tagBtn=null;
+		this.tagList=null;
 		this.news=null;
 		this.oops=null;
 		this.sorted=new Object();
@@ -110,8 +115,51 @@
 		 * Sets tags in cookies.
 		 */
 		this.setTags = function(){
+			//fetch tags from txtbox, add them to qArr, set cookie.  Check for dups.
+			// remove <  >  /  \  &  ? %  @ - ! 
+			
+			var tempArr = new Array(), temp="", spcChars=["<",">","/","\\","&","?","%","@","-","!"],x=0;
+			temp=this.tagTxt.val().replace(/ /g, '+')
+			temp= this.clearStr(temp,spcChars);
+			tempArr = temp.split(',');
+			//tempArr is clean and ready. Now add it to qArr.
+			this.qArr=this.mergeArr(this.qArr.concat(tempArr));
+
 			this.cookieVal = Aes.Ctr.encrypt(this.qArr.toString(), this.password, 256);
 			this.setCookie();
+			this.tagList.empty();
+			for (var i=0 ; i < this.qArr.length ; i++){
+				jQuery('<span>' + this.qArr[i] + '</span>', {
+				}).appendTo(this.tagList);
+			}
+		};
+		
+		
+		 /**
+		 * Public Method mergeArr()
+		 * Merges arrays without duplicating items.
+		 */
+		this.mergeArr = function(array) {
+			var a = array.concat();
+			for(var i=0; i<a.length; ++i) {
+				for(var j=i+1; j<a.length; ++j) {
+					if(a[i] === a[j])
+					a.splice(j, 1);
+				}
+			}
+			return a;
+		};
+		
+		
+		 /**
+		 * Public Method clearStr()
+		 * Removes a set of strings from a string.
+		 */
+		this.clearStr = function(str,arr){
+			for (var i  in arr){
+				str=str.replace(arr[i],"");
+			}
+			return str;
 		};
 		 
 		 
@@ -165,6 +213,63 @@
 			$("#" + this.options.id).empty()
 			this.PNode=$("#" + this.options.id);
 			notice("Parent Node Set.");
+		};
+
+
+		/**
+		 * Public Method setFNode()
+		 * Renders and sets frame node (FNode),
+		 */
+		this.setFNode = function(){
+			if($("#fNode-" + this.options.id).length == 0) {
+				jQuery('<div/>', {
+					id: "fNode-" + this.options.id
+				}).appendTo(this.PNode);
+				notice("Frame created: #fNode-" + this.options.id);
+			};
+			$("#fNode-" + this.options.id).empty()
+			this.FNode=$("#fNode-" + this.options.id);
+			notice("Frame Node Set.");
+		};
+
+
+		/**
+		 * Public Method setTNode()
+		 * Renders and sets Tag node (TNode),
+		 * and all it's elements. -> textBox, sendButton, listTags
+		 */
+		this.setTNode = function(){
+			var _self=this;
+			if($("#tNode-" + this.options.id).length == 0) {
+				jQuery('<div/>', {
+					id: "tNode-" + this.options.id
+				}).appendTo(this.PNode);
+				notice("Tag created: #tNode-" + this.options.id);
+			};
+			$("#tNode-" + this.options.id).empty()
+			this.TNode=$("#tNode-" + this.options.id);
+			notice("Tag Node Set.");
+			//Setting contents.
+			jQuery('<input/>', {
+					id: "tagTxt-" + this.options.id,
+					class: "tagTxt-" + this.options.id,
+					type: "text"
+			}).appendTo(this.TNode);
+			this.tagTxt=$("#tagTxt-" + this.options.id);
+			jQuery('<input/>', {
+					id: "tagBtn-" + this.options.id,
+					class: "tagBtn-" + this.options.id,
+					type: "button",
+					value: "+Tags"
+			}).appendTo(this.TNode);
+			this.tagBtn=$("#tagBtn-" + this.options.id);
+			jQuery('<span/>', {
+					id: "tagList-" + this.options.id,
+					class: "tagList-" + this.options.id,
+			}).appendTo(this.TNode);
+			this.tagList=$("#tagList-" + this.options.id);
+			//actions...
+			this.tagBtn.click(function(){ _self.setTags(); });
 		};
 
 		
@@ -349,11 +454,13 @@
 		this.init = function() {
 			notice("Initializing...");
 			this.checkParams();
+			this.setPNode();
+			this.setTNode();
+			this.setFNode();
 			if(this.options.autoLoad){
 				this.fetchTags();
 				this.setTags();
 			}
-			this.setPNode();
 			this.fetchNews();
 		};
 		
